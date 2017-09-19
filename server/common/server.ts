@@ -13,30 +13,21 @@ import { LogManager } from './log-manager';
 
 import * as bunyan from 'bunyan';
 
-import * as logger from 'express-bunyan-logger';
+import * as logger from 'express-pino-logger';
+import * as fs from 'fs';
+import * as pinoms from 'pino-multi-stream';
 
-const bunyanOpts = {
-  name: 'myapp',
-  streams: [
-    {
-      level: process.env.LOG_LEVEL,
-      stream: process.stdout,       // log INFO and above to stdout
-      type: 'stream'
-    },
-    {
-      path: process.env.LOG_DIRECTORY + 'server.log',  // log ERROR and above to a file
-      type: 'rotating-file',
-      period: '1d',   // daily rotation
-      count: 3        // keep 3 back copies
-    }
-  ]
-  /* Uncomment this for custom UUID
-  ,
-  genReqId: (req) => {
-    return req.headers['x-request-id'];
-  }*/
-};
+const streams = [
+  {
+    level: process.env.LOG_LEVEL,
+    stream: process.stdout
+  },
+  {
+    stream: fs.createWriteStream(process.env.LOG_DIRECTORY + 'server.log')
+  }
+];
 
+const pino = pinoms({streams: streams});
 
 const LOG = LogManager.getInstance().getLogger();
 
@@ -68,17 +59,19 @@ export default class ExpressServer {
     app.set('appPath', root + 'client');
     app.use(bodyParser.json());
     app.use(helmet());
-    app.use(logger(bunyanOpts));
+    app.use(logger({
+      logger: pino
+    }));
     app.use(bodyParser.urlencoded({ extended: true }));
     app.use(cookieParser(process.env.SESSION_SECRET));
-  //  app.use(csrf({ cookie: true }));
+    //  app.use(csrf({ cookie: true }));
     app.use(express.static(`${root}/public`));
     app.use(responseTime({ suffix: false }));
     app.use(partialResponse());
     app.use((req: any, res, next) => {
       // Set using X-Request-Id or generated automatically
-      console.log(req.log.fields.req_id);
-      LogManager.getInstance().setUUID(req.log.fields.req_id);
+    //  console.log(req.log.fields);
+   //   LogManager.getInstance().setUUID(req.log.fields.req_id);
       next();
     });
     // Metrics endpoint

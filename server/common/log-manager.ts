@@ -1,27 +1,23 @@
 import { Request, Response } from 'express';
-import * as bunyan from 'bunyan';
+import * as logger from 'express-pino-logger';
+import * as fs from 'fs';
+import * as pinoms from 'pino-multi-stream';
 
-const bunyanOpts = {
-    name: 'myapp',
-    streams: [
-        {
-            level: process.env.LOG_LEVEL,
-            stream: process.stdout,       // log INFO and above to stdout
-            type: 'stream'
-        },
-        {
-            path: process.env.LOG_DIRECTORY + 'application.log',  // log ERROR and above to a file
-            type: 'rotating-file',
-            period: '1d',   // daily rotation
-            count: 3        // keep 3 back copies
-        }
-    ]
-};
+const streams = [
+  {
+    level: process.env.LOG_LEVEL,
+    stream: process.stdout
+  },
+  {
+    stream: fs.createWriteStream(process.env.LOG_DIRECTORY + 'application.log')
+  }
+];
+
 
 
 export class LogManager {
     private static instance: LogManager;
-    private logger: bunyan;
+    private logger: any;
     private uuid: string;
 
     private constructor() {
@@ -31,16 +27,16 @@ export class LogManager {
         if (!LogManager.instance) {
             LogManager.instance = new LogManager();
             // ... any one time initialization goes here ...
-            LogManager.instance.initLogger(bunyan.createLogger(bunyanOpts));
+            LogManager.instance.initLogger({streams: streams});
         }
         return LogManager.instance;
     }
 
-    private initLogger(logger: bunyan) {
-        this.logger = logger;
+    private initLogger(config: any) {
+        this.logger = pinoms(config);
     }
 
-    public getLogger(): bunyan {
+    public getLogger(): any {
         return this.logger;
     }
 
